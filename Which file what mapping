@@ -1,0 +1,104 @@
+import os
+import sounddevice as sd
+import soundfile as sf
+import numpy as np
+
+# Path to the folder containing WAV files
+folder_path = r"C:\Users\lucap\PycharmProjects\SoundPattern"
+
+# Lists to store WAV file names, audio data, and sample rates
+wav_files = []
+data = []
+fs_values = []
+
+# Read all WAV files and store data and sample rates
+for filename in os.listdir(folder_path):
+    if filename.endswith(".wav"):
+        wav_files.append(filename)
+        wav_path = os.path.join(folder_path, filename)
+        print(wav_files[-1])
+        tmpdata, tmpfs = sf.read(wav_path)
+        data.append(tmpdata)
+        fs_values.append(tmpfs)
+
+# Check if there are at least two files
+if len(data) < 2:
+    raise ValueError("You need at least two audio files for stereo playback")
+
+# Check if all files have the same sample rate
+unique_fs = set(fs_values)
+if len(unique_fs) > 1:
+    raise ValueError("All audio files must have the same sample rate")
+
+# Ensure each file has only one channel
+for i in range(len(data)):
+    if len(data[i].shape) != 1:
+        raise ValueError(f"File {i + 1} must have only one channel")
+
+# Get the common sample rate
+fs = fs_values[0]
+
+# Convert data type to int16
+data_int16 = [np.int16(d * 32767) for d in data]
+
+# Specify the device ID
+device_id = 8
+
+# Check if device ID is valid
+num_devices = len(sd.query_devices())
+if device_id >= num_devices:
+    raise ValueError("Invalid device ID")
+
+# Define volume adjustment factor (0.1 for 10% volume)
+volume_factor = 0.3
+
+# Apply volume adjustment to the audio data
+data_int16_scaled = [np.int16(d * volume_factor) for d in data_int16]
+
+# Play audio on different channels simultaneously
+stream = sd.OutputStream(channels=30, samplerate=fs, dtype='int16', device=device_id)
+
+# Define audio data for each speaker (adjust as needed)
+sounds = [data_int16_scaled[0]#speaker1
+         ,data_int16_scaled[0]#speaker2
+         ,data_int16_scaled[4]#speaker3
+         ,data_int16_scaled[4]#speaker4
+         ,data_int16_scaled[4]#speaker5
+         ,data_int16_scaled[1]#speaker6
+         ,data_int16_scaled[1]#speaker7
+         ,data_int16_scaled[1]#speaker8
+         ,data_int16_scaled[2]#speaker9
+         ,data_int16_scaled[2]#speaker10
+         ,data_int16_scaled[3]#speaker11
+         ,data_int16_scaled[3]#speaker12
+         ,data_int16_scaled[4]#speaker13
+         ,data_int16_scaled[4]#speaker14
+         ,data_int16_scaled[0]#speaker15
+         ,data_int16_scaled[0]#speaker16
+         ,data_int16_scaled[0]#speaker17
+         ,data_int16_scaled[5]#speaker18
+         ,data_int16_scaled[6]#speaker19
+         ,data_int16_scaled[6]#speaker20
+         ,data_int16_scaled[6]#speaker21
+         ,data_int16_scaled[7]#speaker22
+         ,data_int16_scaled[7]#speaker23
+         ,data_int16_scaled[8]#speaker24
+         ,data_int16_scaled[9]#speaker25
+         ,data_int16_scaled[10]#speaker26
+         ,data_int16_scaled[11]#speaker27
+         ,data_int16_scaled[11]#speaker28
+         ,data_int16_scaled[12]#speaker29
+         ,data_int16_scaled[12]]#speaker30
+
+with stream:
+    stream.start()
+    # Ensure we have at least two audio files
+    if len(data_int16_scaled) >= 2:
+        stream.write(np.column_stack((sounds)))
+    else:
+        raise ValueError("You need at least two audio files for stereo playback")
+
+    while stream.active:
+        sd.sleep(100)
+
+print("Playback completed.")
