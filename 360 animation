@@ -1,0 +1,78 @@
+import os
+import sounddevice as sd
+import soundfile as sf
+from pydub import AudioSegment
+
+# Path to the folder containing WAV files
+folder_path = r"C:\Users\lucap\PycharmProjects\SoundPattern"
+
+# Lists to store WAV file names, audio data, and sample rates
+wav_files = []
+data = []
+fs_values = []
+
+# Read all WAV files and store data and sample rates
+for filename in os.listdir(folder_path):
+    if filename.endswith(".wav"):
+        wav_files.append(filename)
+        wav_path = os.path.join(folder_path, filename)
+        print(wav_files[-1])
+        tmpdata, tmpfs = sf.read(wav_path)
+        data.append(tmpdata)
+        fs_values.append(tmpfs)
+
+# Check if all files have the same sample rate
+unique_fs = set(fs_values)
+if len(unique_fs) > 1:
+    raise ValueError("All audio files must have the same sample rate")
+
+# Get the common sample rate
+fs = fs_values[0]
+
+# Initialize the overlay with the first song
+overlay = AudioSegment.from_wav(os.path.join(folder_path, wav_files[0]))
+
+# Overlay the rest of the songs
+for i in range(1, len(wav_files)):
+    current_song = AudioSegment.from_wav(os.path.join(folder_path, wav_files[i]))
+    overlay = overlay.overlay(current_song, position=0)
+
+
+# Export the final overlayed sound to a temporary file
+temp_output_path = os.path.join(folder_path, "overlay_output.wav")
+overlay.export(temp_output_path, format="wav")
+
+# Read the overlayed sound
+overlay_data, _ = sf.read(temp_output_path)
+
+# Define the number of speakers available
+num_speakers = 30
+
+volume_factor=0.1
+
+# Calculate total duration of the overlayed sound
+total_duration = len(overlay_data) / fs  # Total duration in seconds
+
+# Desired duration per speaker
+duration_per_speaker = 5  # in seconds
+
+# Calculate the number of speakers needed to cover the entire duration
+num_speakers_needed = int(total_duration / duration_per_speaker)
+
+print(f"Number of speakers needed to play the entire song for {duration_per_speaker} seconds per speaker: {num_speakers_needed}")
+
+# Loop through each speaker and play the overlayed sound with overlap
+for speaker_number in range(0, num_speakers_needed ):
+
+    # Calculate the start and end indices with overlap
+    start_index = int((speaker_number - 1) * fs * (duration_per_speaker))
+    end_index = int(speaker_number * fs * duration_per_speaker)
+
+    # Ensure the last speaker wraps around to the first speaker
+    # Define the mapping for current speaker and two following speakers
+    mapping = [(speaker_number+i) % num_speakers + 1 for i in range(4)]
+    print(f"Playing on Speaker {mapping}")
+
+    # Play the portion of the overlayed sound
+    sd.play(overlay_data[start_index:end_index]*volume_factor, fs, device=8, mapping=mapping)
+    sd.wait()
