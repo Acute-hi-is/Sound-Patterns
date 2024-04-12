@@ -1,0 +1,92 @@
+import os
+import sounddevice as sd
+import soundfile as sf
+import numpy as np
+import time
+
+def play_audio_with_animation(audio_files_mapping_list, audio_data, fs, device_id, duration_per_segment):
+    # Start the audio stream
+    stream.start()
+    current_time = time.time()
+    while True:
+        for mapping in audio_files_mapping_list:
+            # Prepare audio data for playback
+            playback_data = [audio_data[mapping[speaker_number]] for speaker_number in range(30)]
+            max_length = max(len(data) for data in playback_data)
+            # Pad shorter audio data with zeros to match the length of the longest
+            playback_data = [np.pad(data, (0, max_length - len(data)), mode='constant') for data in playback_data]
+            # Write audio data to the stream
+            stream.write(np.column_stack(playback_data))
+            # Update current time and wait for the next segment
+            current_time += duration_per_segment
+            sleep_time = current_time - time.time()
+            if sleep_time > 0:
+                time.sleep(sleep_time)
+                current_time += duration_per_segment
+
+def generate_audio_files_mapping_list(num_segments, num_speakers, num_audio_files):
+    # Generate mapping of audio files to speakers for each segment
+    audio_files_mapping_list = []
+    for i in range(num_segments):
+        audio_files_mapping = {}
+        for j in range(30):
+            # Circular mapping to ensure continuous playback
+            audio_files_mapping[j] = (i + j) % num_audio_files
+        audio_files_mapping_list.append(audio_files_mapping)
+    return audio_files_mapping_list
+
+# Folder path containing audio files
+folder_path = r"C:\Users\lucap\PycharmProjects\SoundPattern"
+
+# List to store audio file names and sample rates
+audio_files = []
+fs_values = []
+
+# Retrieve audio file names and sample rates
+for filename in os.listdir(folder_path):
+    if filename.endswith(".wav"):
+        audio_files.append(filename)
+        wav_path = os.path.join(folder_path, filename)
+        print(audio_files[-1])
+        _, tmpfs = sf.read(wav_path)
+        fs_values.append(tmpfs)
+
+
+# Check if all audio files have the same sample rate
+unique_fs = set(fs_values)
+if len(unique_fs) > 1:
+    raise ValueError("All audio files must have the same sample rate")
+
+# Sample rate for audio playback
+fs = fs_values[0]
+
+# Read audio data from files and scale to int16
+audio_data = []
+for filename in audio_files:
+    wav_path = os.path.join(folder_path, filename)
+    data, _ = sf.read(wav_path)
+    audio_data.append(np.int16(data * 32767))
+
+# Audio device ID for playback
+device_id = 8
+
+# Duration per segment for switching speakers
+duration_per_segment = 3  # Switch speakers every 3 seconds
+
+# Number of segments based on the number of audio files
+num_segments = len(audio_files)
+
+# Generate mapping of audio files to speakers for each segment
+audio_files_mapping_list = generate_audio_files_mapping_list(num_segments, 30, len(audio_files))
+
+# Volume scaling factor
+volume_factor = 0.1
+
+# Scale audio data based on volume factor
+scaled_audio_data = [np.int16(d * volume_factor) for d in audio_data]
+
+# Initialize audio stream for playback
+stream = sd.OutputStream(channels=30, samplerate=fs, dtype='int16', device=device_id)
+
+# Start playback with animation
+play_audio_with_animation(audio_files_mapping_list, scaled_audio_data, fs, device_id, duration_per_segment)
